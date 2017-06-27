@@ -7,7 +7,8 @@ from urllib import urlopen
 from urllib import urlencode
 import os
 from shutil import rmtree
-from time import sleep, time
+from time import sleep
+import time
 
 
 def auth(login, pwd):
@@ -59,10 +60,10 @@ def emoji_wipe(plain):
     array = bytearray(plain)
     while b'\xf0' in array:
         pos = array.find(b'\xf0')
-        array = array.replace(array[pos:], array[pos+4:])
+        array = array.replace(array[pos:], array[pos + 4:])
     while b'\xe2' in array:
         pos = array.find(b'\xe2')
-        array = array.replace(array[pos:], array[pos+3:])
+        array = array.replace(array[pos:], array[pos + 3:])
     return bytearray.decode(array, 'utf-8', errors='ignore')
 
 
@@ -87,23 +88,80 @@ def request(method, params, is_one):
         pass
 
 
-def get_photos_method(uid, token, file_name, f, photo_method):
+def get_photos_method(uid, token, file_name, f, photo_method, active, banned, user, group):
     params = {}
     params['access_token'] = token
     params['owner_id'] = uid
     params['count'] = 0
-    photos_count = request('photos.%s' % photo_method, params, is_one=True)
+    active_group = check_group(uid, token)
+    if (active and user):
+        checking = check_user(uid, token, active, banned)
+    elif (banned and user):
+        checking = check_user(uid, token, active, banned)
+    elif active and group:
+        checking = active_group
+    else:
+        checking = True
+    if checking:
+        photos_count = request('photos.%s' % photo_method, params, is_one=True)
+        path = file_name
+        if photos_count:
+            try:
+                f = open(path, 'a')
+                fave_iterations = int(photos_count / 100) + 1
+                params['count'] = 100
+                for i in range(0, fave_iterations, 1):
+                    params['offset'] = 100 * i
+                    photos_response = request('photos.%s' % photo_method, params, is_one=False)
+                    photos_response = photos_response[1:]
+                    for each in photos_response:
+                        if 'src_xxbig' in each:
+                            link = each['src_xxbig']
+                        elif 'src_xbig' in each:
+                            link = each['src_xbig']
+                        elif 'src_xbig' in each:
+                            link = each['src_xbig']
+                        elif 'src_big' in each:
+                            link = each['src_big']
+                        elif 'src_small' in each:
+                            link = each['src_small']
+                        elif 'src' in each:
+                            link = each['src']
+                        else:
+                            link = '???'
+                        f.write('%s:%s\n' % (str(uid), link))
+                        print('collecting %s:%s' % (str(uid), link))
+                f.close()
+            except Exception:
+                pass
+        else:
+            pass
+    else:
+        pass
+
+
+def get_photos_album(uid, token, file_name, f, album_id, active, banned, user, group):
+    params = {}
+    params['access_token'] = token
+    params['owner_id'] = uid
+    params['count'] = 1000
+    params['album_id'] = str(album_id)
     path = file_name
-    if photos_count:
+    active_group = check_group(uid, token)
+    if (active and user):
+        checking = check_user(uid, token, active, banned)
+    elif (banned and user):
+        checking = check_user(uid, token, active, banned)
+    elif active and group:
+        checking = active_group
+    else:
+        checking = True
+    if checking:
         try:
             f = open(path, 'a')
-            fave_iterations = int(photos_count/100)+1
-            params['count'] = 100
-            for i in range(0,fave_iterations,1):
-                params['offset'] = 100*i
-                photos_response = request('photos.%s' % photo_method, params, is_one=False)
-                photos_response = photos_response[1:]
-                for each in photos_response:
+            photos_response = request('photos.get', params, is_one=False)
+            for each in photos_response:
+                try:
                     if 'src_xxbig' in each:
                         link = each['src_xxbig']
                     elif 'src_xbig' in each:
@@ -120,6 +178,8 @@ def get_photos_method(uid, token, file_name, f, photo_method):
                         link = '???'
                     f.write('%s:%s\n' % (str(uid), link))
                     print('collecting %s:%s' % (str(uid), link))
+                except Exception:
+                    pass
             f.close()
         except Exception:
             pass
@@ -127,43 +187,8 @@ def get_photos_method(uid, token, file_name, f, photo_method):
         pass
 
 
-def get_photos_album(uid, token, file_name, f, album_id):
-    params = {}
-    params['access_token'] = token
-    params['owner_id'] = uid
-    params['count'] = 1000
-    params['album_id'] = str(album_id)
-    path = file_name
-    try:
-        f = open(path, 'a')
-        photos_response = request('photos.get', params, is_one=False)
-        for each in photos_response:
-            try:
-                if 'src_xxbig' in each:
-                    link = each['src_xxbig']
-                elif 'src_xbig' in each:
-                    link = each['src_xbig']
-                elif 'src_xbig' in each:
-                    link = each['src_xbig']
-                elif 'src_big' in each:
-                    link = each['src_big']
-                elif 'src_small' in each:
-                    link = each['src_small']
-                elif 'src' in each:
-                    link = each['src']
-                else:
-                    link = '???'
-                f.write('%s:%s\n' % (str(uid), link))
-                print('collecting %s:%s' % (str(uid), link))
-            except Exception:
-                pass
-        f.close()
-    except Exception:
-        pass
-
-
-def get_photos(uid, token, directory_name, f):
-    download_methods = ['getAll']#, 'getUserPhotos' 'getNewTags'
+def get_photos(uid, token, directory_name, f, active, banned, user, group):
+    download_methods = ['getAll']  # , 'getUserPhotos' 'getNewTags'
     album_ids = [-6, -7, -15]
 
     delim = '-'
@@ -177,9 +202,9 @@ def get_photos(uid, token, directory_name, f):
 
     for uid_line in uid_list:
         for index, d_method in enumerate(download_methods):
-            get_photos_method(uid_line, token, directory_name, f, d_method)
+            get_photos_method(uid_line, token, directory_name, f, d_method, active, banned, user, group)
         for index, album_num in enumerate(album_ids):
-            get_photos_album(uid_line, token, directory_name, f, album_num)
+            get_photos_album(uid_line, token, directory_name, f, album_num, active, banned, user, group)
 
 
 def check_token(token):
@@ -194,9 +219,46 @@ def check_token(token):
         return False
 
 
+def check_user(uid, token, active, banned):
+    both = active and banned
+    userparams = {}
+    userparams['access_token'] = token
+    userparams['user_ids'] = uid
+    userparams['fields'] = 'last_seen'
+    user = request('users.get', userparams, is_one=True)
+    if (banned and 'deactivated' in user):
+        return False
+    elif (active and 'last_seen' in user):
+        last_seen = user['last_seen']
+        last_seen_year = time.localtime(last_seen['time'])[0]
+        last_seen_month = time.localtime(last_seen['time'])[1]
+        last_seen_day = time.localtime(last_seen['time'])[2]
+        actual_year = time.localtime(time.time())[0]
+        actual_month = time.localtime(time.time())[1]
+        actual_day = time.localtime(time.time())[2]
+        years_equal = actual_year == last_seen_year
+        month_sub = actual_month - last_seen_month
+        day_sub = last_seen_day - actual_day
+        user_active = (years_equal and month_sub < 3) or (years_equal and (month_sub == 3 and day_sub > 0))
+        return user_active
+    else:
+        return True
+
+
+def check_group(uid, token):
+    groupparams = {}
+    groupparams['access_token'] = token
+    groupparams['group_id'] = uid
+    group = request('groups.getById', groupparams, is_one=True)
+    if ('deactivated' in group):
+        return False
+    else:
+        return True
+
+
 def download_photo(dir_name, url):
     url_as = url[url.find(':') + 1:]
-    file_name = url[:url.find(':')] + '_' + url[url.rfind('/')+1:]
+    file_name = url[:url.find(':')] + '_' + url[url.rfind('/') + 1:]
     resource = urlopen(url_as)
     out = open('%s/%s' % (dir_name, file_name), 'wb')
     out.write(resource.read())
@@ -223,9 +285,11 @@ def help():
     print('" python photos.py auth login password " --- Authorizes user. Tel number must be w/o "+"')
     print('example: "python photos.py auth 79211234567 qwerty123456"\n\n')
     print('" python photos.py deauth " --- Deauthorizes current user\n\n')
-    print('" python photos.py collect type id " --- Takes list of all photos. Type can only be "user" or "group". Id is user identifier in vk. You cannot use users domain, id must be a number. Creates a txt file with list of photos.')
+    print(
+        '" python photos.py collect type id " --- Takes list of all photos. Type can only be "user" or "group". Id is user identifier in vk. You cannot use users domain, id must be a number. Creates a txt file with list of photos.')
     print('example: "python photos.py collect user 1234567" or "python photos.py collect group 7654321"\n\n')
-    print('" python photos.py download list " --- Downloads collected list of photos. List is name of file, watch your script directory.')
+    print(
+        '" python photos.py download list " --- Downloads collected list of photos. List is name of file, watch your script directory.')
     print('example: "python photos.py download user_1234567.txt" or "python photos.py download group_7654321.txt"\n\n')
     sys.exit('\n *** -------------------------------------------------------- *** \n\n')
 
@@ -238,7 +302,8 @@ try:
 except Exception:
     drop()
 
-if (first_param != 'help') and (first_param != 'deauth') and (first_param != 'auth') and (first_param != 'collect') and (first_param != 'download'):
+if (first_param != 'help') and (first_param != 'deauth') and (first_param != 'auth') and (
+    first_param != 'collect') and (first_param != 'download'):
     drop()
 
 if first_param == 'help':
@@ -270,13 +335,33 @@ if first_param == 'auth':
 
 if first_param == 'collect':
     try:
-        second_param = sys.argv[2]
-        if (second_param != 'group') and (second_param != 'user'):
-            drop()
-        third_param = sys.argv[3]
+        active = sys.argv[2] == 'active'
+        banned = sys.argv[2] == 'notbanned'
+        both = (sys.argv[2] == 'active' and sys.argv[3] == 'notbanned') \
+               or (sys.argv[3] == 'active' and sys.argv[4] == 'notbanned')
+        if (both):
+            second_param = sys.argv[4]
+            if (second_param != 'group') and (second_param != 'user'):
+                drop()
+            third_param = sys.argv[5]
+        elif (active or banned):
+            second_param = sys.argv[3]
+            if (second_param != 'group') and (second_param != 'user'):
+                drop()
+            third_param = sys.argv[4]
+        else:
+            second_param = sys.argv[2]
+            if (second_param != 'group') and (second_param != 'user'):
+                drop()
+            third_param = sys.argv[3]
     except Exception:
         drop()
-    check_argv(4)
+    if (both):
+        check_argv(6)
+    elif (active or banned):
+        check_argv(5)
+    else:
+        check_argv(4)
     try:
         f = open(file_with_token, 'r')
         token = f.read()
@@ -290,7 +375,7 @@ if first_param == 'collect':
     if not verify:
         if 'access_token=' in token:
             pos = token.find('access_token=')
-            pos +=13
+            pos += 13
             token = token[pos:]
             pos = token.find('&')
             token = token[:pos]
@@ -301,12 +386,14 @@ if first_param == 'collect':
         uid = third_param
         file_name = 'user_%s.txt' % str(uid)
     elif second_param == 'group':
-        uid = '-%s' % third_param
+        uid = third_param
         file_name = 'group_%s.txt' % str(uid)
     else:
         drop()
+    group = second_param == 'group'
+    user = second_param == 'user'
     create_file(file_name)
-    get_photos(uid, token, file_name, f)
+    get_photos(uid, token, file_name, f, active, banned, user, group)
 
 if first_param == 'download':
     try:
@@ -333,7 +420,7 @@ if first_param == 'download':
     total = len(links)
 
     for number, link in enumerate(links):
-        print('downloading %s (%s of %s)' % (link, str(number+1), total))
+        print('downloading %s (%s of %s)' % (link, str(number + 1), total))
         try:
             download_photo(directory_name, link)
         except Exception:
