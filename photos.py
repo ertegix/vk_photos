@@ -93,13 +93,12 @@ def get_photos_method(uid, token, file_name, f, photo_method, active, banned, us
     params['access_token'] = token
     params['owner_id'] = uid
     params['count'] = 0
-    active_group = check_group(uid, token)
     if (active and user):
         checking = check_user(uid, token, active, banned)
     elif (banned and user):
         checking = check_user(uid, token, active, banned)
     elif active and group:
-        checking = active_group
+        checking = check_group(uid, token)
     else:
         checking = True
     if checking:
@@ -147,13 +146,12 @@ def get_photos_album(uid, token, file_name, f, album_id, active, banned, user, g
     params['count'] = 1000
     params['album_id'] = str(album_id)
     path = file_name
-    active_group = check_group(uid, token)
     if (active and user):
         checking = check_user(uid, token, active, banned)
     elif (banned and user):
         checking = check_user(uid, token, active, banned)
     elif active and group:
-        checking = active_group
+        checking = check_group(uid, token)
     else:
         checking = True
     if checking:
