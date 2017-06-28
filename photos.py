@@ -228,30 +228,39 @@ def check_token(token):
 
 
 def check_user(uid, token, active, banned):
-    both = active and banned
     userparams = {}
     userparams['access_token'] = token
     userparams['user_ids'] = uid
     userparams['fields'] = 'last_seen'
     user = request('users.get', userparams, is_one=True)
-    if (banned and 'deactivated' in user):
+    if active and banned:
+        return check_active(user) and check_notbanned(user)
+    elif (banned):
+        return check_notbanned(user)
+    elif (active):
+        return check_active(user)
+    else:
         return False
-    elif (active and 'last_seen' in user):
-        last_seen = user['last_seen']
-        last_seen_year = time.localtime(last_seen['time'])[0]
-        last_seen_month = time.localtime(last_seen['time'])[1]
-        last_seen_day = time.localtime(last_seen['time'])[2]
-        actual_year = time.localtime(time.time())[0]
-        actual_month = time.localtime(time.time())[1]
-        actual_day = time.localtime(time.time())[2]
-        years_equal = actual_year == last_seen_year
-        month_sub = actual_month - last_seen_month
-        day_sub = last_seen_day - actual_day
-        user_active = (years_equal and month_sub < 3) or (years_equal and (month_sub == 3 and day_sub > 0))
-        return user_active
+
+def check_notbanned(user):
+    if 'deactivated' in user:
+        return False
     else:
         return True
 
+def check_active(user):
+    last_seen = user['last_seen']
+    last_seen_year = time.localtime(last_seen['time'])[0]
+    last_seen_month = time.localtime(last_seen['time'])[1]
+    last_seen_day = time.localtime(last_seen['time'])[2]
+    actual_year = time.localtime(time.time())[0]
+    actual_month = time.localtime(time.time())[1]
+    actual_day = time.localtime(time.time())[2]
+    years_equal = actual_year == last_seen_year
+    month_sub = actual_month - last_seen_month
+    day_sub = last_seen_day - actual_day
+    user_active = (years_equal and month_sub < 3) or (years_equal and (month_sub == 3 and day_sub > 0))
+    return user_active
 
 def check_group(uid, token):
     groupparams = {}
@@ -346,12 +355,14 @@ if first_param == 'collect':
         active = sys.argv[2] == 'active'
         banned = sys.argv[2] == 'notbanned'
         both = (sys.argv[2] == 'active' and sys.argv[3] == 'notbanned') \
-               or (sys.argv[3] == 'active' and sys.argv[4] == 'notbanned')
+               or (sys.argv[3] == 'active' and sys.argv[2] == 'notbanned')
         if (both):
             second_param = sys.argv[4]
             if (second_param != 'group') and (second_param != 'user'):
                 drop()
             third_param = sys.argv[5]
+            active = True
+            banned = True
         elif (active or banned):
             second_param = sys.argv[3]
             if (second_param != 'group') and (second_param != 'user'):
