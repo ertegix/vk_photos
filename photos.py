@@ -91,6 +91,8 @@ def request(method, params, is_one):
 def get_photos_method(uid, token, file_name, f, photo_method, active, banned, user, group):
     params = {}
     params['access_token'] = token
+    if group:
+        uid = '-' + uid
     params['owner_id'] = uid
     params['count'] = 0
     if (active and user):
@@ -142,6 +144,8 @@ def get_photos_method(uid, token, file_name, f, photo_method, active, banned, us
 def get_photos_album(uid, token, file_name, f, album_id, active, banned, user, group):
     params = {}
     params['access_token'] = token
+    if group:
+        uid = '-' + uid
     params['owner_id'] = uid
     params['count'] = 1000
     params['album_id'] = str(album_id)
