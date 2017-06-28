@@ -128,6 +128,9 @@ def get_photos_method(uid, token, file_name, f, photo_method, active, banned, us
                             link = each['src_small']
                         elif 'src' in each:
                             link = each['src']
+                        elif 'error' in each:
+                            link = each['error']
+                            link = link['error_msg']
                         else:
                             link = '???'
                         f.write('%s:%s\n' % (str(uid), link))
@@ -176,6 +179,9 @@ def get_photos_album(uid, token, file_name, f, album_id, active, banned, user, g
                         link = each['src_small']
                     elif 'src' in each:
                         link = each['src']
+                    elif 'error' in each:
+                        link = each['error']
+                        link = link['error_msg']
                     else:
                         link = '???'
                     f.write('%s:%s\n' % (str(uid), link))
