@@ -249,18 +249,21 @@ def check_notbanned(user):
         return True
 
 def check_active(user):
-    last_seen = user['last_seen']
-    last_seen_year = time.localtime(last_seen['time'])[0]
-    last_seen_month = time.localtime(last_seen['time'])[1]
-    last_seen_day = time.localtime(last_seen['time'])[2]
-    actual_year = time.localtime(time.time())[0]
-    actual_month = time.localtime(time.time())[1]
-    actual_day = time.localtime(time.time())[2]
-    years_equal = actual_year == last_seen_year
-    month_sub = actual_month - last_seen_month
-    day_sub = last_seen_day - actual_day
-    user_active = (years_equal and month_sub < 3) or (years_equal and (month_sub == 3 and day_sub > 0))
-    return user_active
+    if 'last_seen' in user:
+        last_seen = user['last_seen']
+        last_seen_year = time.localtime(last_seen['time'])[0]
+        last_seen_month = time.localtime(last_seen['time'])[1]
+        last_seen_day = time.localtime(last_seen['time'])[2]
+        actual_year = time.localtime(time.time())[0]
+        actual_month = time.localtime(time.time())[1]
+        actual_day = time.localtime(time.time())[2]
+        years_equal = actual_year == last_seen_year
+        month_sub = actual_month - last_seen_month
+        day_sub = last_seen_day - actual_day
+        user_active = (years_equal and month_sub < 3) or (years_equal and (month_sub == 3 and day_sub > 0))
+        return user_active
+    else:
+        return False
 
 def check_group(uid, token):
     groupparams = {}
